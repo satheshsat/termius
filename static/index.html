@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termius Clone - SSH Client & Terminal Vault</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/css/xterm.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <div>
+      <div class="brand-header">
+        <div class="brand-icon">⚡</div>
+        <div style="display:flex; flex-direction:column;">
+          <div class="brand-text">TERMIUS</div>
+          <span style="font-size:10px; color:var(--text-muted); font-weight:600;">PYTHON SSH CLIENT</span>
+        </div>
+        <span class="brand-tag">PRO</span>
+      </div>
+
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" class="search-input" placeholder="Search hosts, snippets...">
+        <span class="search-shortcut">Ctrl+K</span>
+      </div>
+
+      <ul class="nav-menu">
+        <li class="nav-item active" data-view="hosts-view" id="nav-hosts">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">💻</span>
+            <span>Hosts</span>
+          </div>
+          <span class="badge" id="hosts-count-badge">0</span>
+        </li>
+        <li class="nav-item" data-view="terminals-view" id="nav-terminals">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">⚡</span>
+            <span>Terminals</span>
+          </div>
+          <span class="badge badge-primary" id="sessions-count-badge" style="display:none;">0</span>
+        </li>
+        <li class="nav-item" data-view="sftp-view" id="nav-sftp">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">📁</span>
+            <span>SFTP Explorer</span>
+          </div>
+        </li>
+        <li class="nav-item" data-view="snippets-view" id="nav-snippets">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">📋</span>
+            <span>Snippets</span>
+          </div>
+          <span class="badge" id="snippets-count-badge">0</span>
+        </li>
+        <li class="nav-item" data-view="tunnels-view" id="nav-tunnels">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">🔀</span>
+            <span>Port Forwarding</span>
+          </div>
+          <span class="badge" id="tunnels-count-badge">0</span>
+        </li>
+        <li class="nav-item" data-view="keys-view" id="nav-keys">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">🔑</span>
+            <span>Keychain & Keys</span>
+          </div>
+          <span class="badge" id="keys-count-badge">0</span>
+        </li>
+        <li class="nav-item" data-view="settings-view" id="nav-settings">
+          <div class="nav-item-left">
+            <span class="nav-item-icon">⚙️</span>
+            <span>Settings & Vault</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- SIDEBAR FOOTER -->
+    <div class="sidebar-footer">
+      <div class="vault-status-card" id="vault-status-btn" title="Click to manage Master Password / Lock Vault">
+        <div class="vault-info">
+          <div class="vault-dot" id="vault-status-dot"></div>
+          <div>
+            <div style="font-weight:600; font-size:12px;" id="vault-status-text">Vault Unlocked</div>
+            <div class="vault-json-pill"><span>📄</span> termius_vault.json</div>
+          </div>
+        </div>
+        <button class="btn btn-icon btn-sm" id="btn-lock-vault" title="Lock Vault">🔒</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main class="main-area">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h2 class="view-title" id="current-view-title">Hosts</h2>
+        <!-- TERMINAL TABS BAR (visible when terminals are active) -->
+        <div class="terminal-tabs" id="terminal-tabs-bar" style="display:none;"></div>
+      </div>
+      <div class="topbar-right" id="topbar-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-quick-connect">⚡ Quick Connect</button>
+        <button class="btn btn-primary btn-sm" id="btn-primary-action">+ New Host</button>
+      </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: HOSTS -->
+    <!-- ========================================== -->
+    <section class="view-container active" id="hosts-view">
+      <div class="filters-bar">
+        <div class="pills-group" id="host-group-pills">
+          <button class="pill active" data-group="all">All Hosts</button>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input type="text" id="host-filter-input" class="form-input" style="width:200px; padding:6px 10px;" placeholder="Filter hosts...">
+        </div>
+      </div>
+      <div class="hosts-grid" id="hosts-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 2: TERMINALS (xterm.js tabs) -->
+    <!-- ========================================== -->
+    <section class="view-container" id="terminals-view">
+      <div class="terminal-workspace">
+        <div class="terminal-active-area">
+          <div class="terminal-header-bar">
+            <div class="terminal-host-info" id="terminal-session-info">
+              <span class="vault-dot"></span>
+              <span id="term-host-name">Not Connected</span>
+            </div>
+            <div class="terminal-actions-bar">
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-snippets" title="Snippet Drawer">📋 Snippets</button>
+              <button class="btn btn-secondary btn-sm" id="btn-term-zoom-out" title="Font Smaller">A-</button>
+              <button class="btn btn-secondary btn-sm" id="btn-term-zoom-in" title="Font Larger">A+</button>
+              <button class="btn btn-secondary btn-sm" id="btn-term-clear" title="Clear Screen">🧹 Clear</button>
+              <button class="btn btn-secondary btn-sm" id="btn-term-reconnect" title="Reconnect">🔄 Reconnect</button>
+            </div>
+          </div>
+          <div class="xterm-viewport-wrapper" id="xterm-viewport">
+            <div id="xterm-container" class="xterm-container"></div>
+          </div>
+        </div>
+
+        <!-- SLIDE-OUT SNIPPETS DRAWER -->
+        <aside class="snippet-side-drawer" id="terminal-snippet-drawer" style="display:none;">
+          <div class="snippet-drawer-header">
+            <span>Quick Run Snippets</span>
+            <button class="modal-close" id="btn-close-snippet-drawer">×</button>
+          </div>
+          <div class="snippet-drawer-list" id="terminal-drawer-snippets">
+            <!-- Snippets for 1-click execution -->
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 3: SFTP EXPLORER -->
+    <!-- ========================================== -->
+    <section class="view-container" id="sftp-view">
+      <div class="sftp-container">
+        <div class="sftp-top-controls">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label class="form-label" style="white-space:nowrap;">Host:</label>
+            <select id="sftp-host-select" class="form-select" style="min-width:180px;">
+              <option value="">Select Host...</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="sftp-btn-connect">Connect SFTP</button>
+          </div>
+          <div class="sftp-breadcrumbs" id="sftp-breadcrumbs-bar">
+            <span class="sftp-crumb" id="sftp-crumb-root">/</span>
+            <span id="sftp-current-path-text" style="color:var(--text-main); font-weight:600;">/</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn btn-secondary btn-sm" id="sftp-btn-up" title="Parent Directory">⬆️ Up</button>
+            <button class="btn btn-secondary btn-sm" id="sftp-btn-mkdir">+ New Folder</button>
+            <label class="btn btn-primary btn-sm" style="margin:0; cursor:pointer;">
+              📤 Upload File
+              <input type="file" id="sftp-file-input" style="display:none;">
+            </label>
+            <button class="btn btn-secondary btn-sm" id="sftp-btn-refresh" title="Refresh">🔄</button>
+          </div>
+        </div>
+        <div class="sftp-table-wrapper">
+          <table class="sftp-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th style="width:120px;">Size</th>
+                <th style="width:100px;">Permissions</th>
+                <th style="width:170px;">Modified</th>
+                <th style="width:120px; text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sftp-table-body">
+              <tr>
+                <td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);">
+                  Select a host above and click "Connect SFTP" to explore remote files.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 4: SNIPPETS -->
+    <!-- ========================================== -->
+    <section class="view-container" id="snippets-view">
+      <div class="filters-bar">
+        <div class="pills-group" id="snippet-tag-pills">
+          <button class="pill active" data-tag="all">All Snippets</button>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-add-snippet">+ New Snippet</button>
+      </div>
+      <div class="snippets-grid" id="snippets-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 5: PORT FORWARDING (TUNNELS) -->
+    <!-- ========================================== -->
+    <section class="view-container" id="tunnels-view">
+      <div class="filters-bar">
+        <p style="font-size:13px; color:var(--text-muted);">
+          Securely tunnel local ports to remote databases, web applications, or services through SSH bastions.
+        </p>
+        <button class="btn btn-primary btn-sm" id="btn-add-tunnel">+ New Port Forwarding Rule</button>
+      </div>
+      <div class="tunnels-grid" id="tunnels-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 6: SSH KEYCHAIN -->
+    <!-- ========================================== -->
+    <section class="view-container" id="keys-view">
+      <div class="filters-bar">
+        <p style="font-size:13px; color:var(--text-muted);">
+          Manage, generate, and store RSA and Ed25519 SSH keys with master password encryption.
+        </p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-secondary btn-sm" id="btn-import-key">📥 Import Existing Key</button>
+          <button class="btn btn-primary btn-sm" id="btn-generate-key">⚡ Generate New SSH Key</button>
+        </div>
+      </div>
+      <div class="keys-grid" id="keys-grid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- VIEW 7: SETTINGS & VAULT -->
+    <!-- ========================================== -->
+    <section class="view-container" id="settings-view">
+      <div class="settings-section">
+        <div class="settings-header">
+          <span>🔒</span> Master Password & AES-256 Encryption
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+          All sensitive SSH passwords and private keys are encrypted using AES-256-GCM with a PBKDF2 100,000-round derived key before writing to <code>termius_vault.json</code>.
+        </p>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <button class="btn btn-primary btn-sm" id="btn-setup-change-pwd">Change / Set Master Password</button>
+          <button class="btn btn-danger btn-sm" id="btn-manual-lock">Lock Vault Immediately</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-header">
+          <span>🎨</span> Terminal Preferences
+        </div>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label class="form-label">Terminal Theme</label>
+            <select id="pref-term-theme" class="form-select">
+              <option value="termius-dark">Termius Dark (Default)</option>
+              <option value="dracula">Dracula</option>
+              <option value="nord">Nord</option>
+              <option value="monokai">Monokai Pro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Font Size (px)</label>
+            <input type="number" id="pref-font-size" class="form-input" min="10" max="24" value="14">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Scrollback Buffer (lines)</label>
+            <input type="number" id="pref-scrollback" class="form-input" min="1000" max="50000" value="5000">
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-secondary btn-sm" id="btn-save-terminal-prefs">Save Preferences</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-header">
+          <span>📁</span> JSON Data File & Backups
+        </div>
+        <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+          All hosts, tunnels, snippets, and credentials are automatically saved to: <strong style="color:var(--accent-cyan); font-family:var(--font-mono);">termius_vault.json</strong> in your workspace.
+        </p>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <a href="/api/settings/export" download="termius_vault_backup.json" class="btn btn-primary btn-sm" style="text-decoration:none;">
+            📥 Export termius_vault.json
+          </a>
+          <label class="btn btn-secondary btn-sm" style="margin:0; cursor:pointer;">
+            📤 Import JSON Backup
+            <input type="file" id="vault-import-input" accept=".json" style="display:none;">
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD / EDIT HOST -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-host">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-host-title">Add New Host</div>
+      <button class="modal-close" data-close-modal="modal-host">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="host-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Label / Name *</label>
+          <input type="text" id="host-label" class="form-input" placeholder="e.g. AWS Bastion or HomeLab" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Group</label>
+          <input type="text" id="host-group" class="form-input" placeholder="e.g. Production, Cloud, Local" value="Default">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:2;">
+          <label class="form-label">Hostname or IP *</label>
+          <input type="text" id="host-hostname" class="form-input" placeholder="192.168.1.100 or ec2-..." required>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Port</label>
+          <input type="number" id="host-port" class="form-input" value="22" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Username *</label>
+          <input type="text" id="host-username" class="form-input" placeholder="root or ubuntu" value="root" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Authentication Type</label>
+          <select id="host-auth-type" class="form-select">
+            <option value="password">Password</option>
+            <option value="key">SSH Key</option>
+            <option value="agent">SSH Agent</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Password auth field -->
+      <div class="form-group" id="host-auth-password-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="host-password" class="form-input" placeholder="Enter SSH password (encrypted in JSON)">
+      </div>
+
+      <!-- SSH Key auth field -->
+      <div class="form-group" id="host-auth-key-group" style="display:none;">
+        <label class="form-label">Select SSH Key from Keychain</label>
+        <select id="host-key-select" class="form-select">
+          <option value="">Choose stored key...</option>
+        </select>
+        <div style="margin-top:6px;">
+          <label class="form-label">Key Passphrase (if encrypted)</label>
+          <input type="password" id="host-passphrase" class="form-input" placeholder="Leave blank if key has no passphrase">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tags (comma-separated)</label>
+          <input type="text" id="host-tags" class="form-input" placeholder="e.g. aws, prod, nginx">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Accent Color</label>
+          <input type="color" id="host-color" class="form-input" value="#6c5ce7" style="height:40px; padding:2px;">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea id="host-notes" class="form-textarea" placeholder="Optional notes about this server..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-host">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-host">Save Host</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD / EDIT SNIPPET -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-snippet">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-snippet-title">New Snippet</div>
+      <button class="modal-close" data-close-modal="modal-snippet">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="snippet-id">
+      <div class="form-group">
+        <label class="form-label">Title *</label>
+        <input type="text" id="snippet-name" class="form-input" placeholder="e.g. Docker logs or Clear Cache" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Command / Script *</label>
+        <textarea id="snippet-command" class="form-textarea" style="min-height:120px;" placeholder="sudo systemctl restart nginx" required></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tags (comma-separated)</label>
+        <input type="text" id="snippet-tags" class="form-input" placeholder="e.g. docker, system, dev">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" id="snippet-desc" class="form-input" placeholder="Brief summary of what this snippet does">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-snippet">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-snippet">Save Snippet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ADD / EDIT TUNNEL -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-tunnel">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-tunnel-title">New Port Forwarding Rule</div>
+      <button class="modal-close" data-close-modal="modal-tunnel">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="tunnel-id">
+      <div class="form-group">
+        <label class="form-label">Rule Name *</label>
+        <input type="text" id="tunnel-name" class="form-input" placeholder="e.g. PostgreSQL Remote Tunnel" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">SSH Bastion / Jump Host *</label>
+        <select id="tunnel-host-id" class="form-select" required>
+          <option value="">Select Host...</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Local Port *</label>
+          <input type="number" id="tunnel-local-port" class="form-input" value="5432" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Forward Type</label>
+          <select id="tunnel-type" class="form-select">
+            <option value="local">Local Port Forwarding</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Remote Destination Host *</label>
+          <input type="text" id="tunnel-remote-host" class="form-input" value="127.0.0.1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Remote Port *</label>
+          <input type="number" id="tunnel-remote-port" class="form-input" value="5432" required>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-tunnel">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-tunnel">Save Tunnel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: GENERATE SSH KEY -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-gen-key">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">Generate New SSH Key</div>
+      <button class="modal-close" data-close-modal="modal-gen-key">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Key Name / Label *</label>
+        <input type="text" id="gen-key-name" class="form-input" placeholder="e.g. id_ed25519_github or aws-key" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Key Type</label>
+          <select id="gen-key-type" class="form-select">
+            <option value="ed25519">Ed25519 (Recommended - fast & secure)</option>
+            <option value="rsa">RSA (Legacy compatibility)</option>
+          </select>
+        </div>
+        <div class="form-group" id="gen-key-bits-group" style="display:none;">
+          <label class="form-label">RSA Bits</label>
+          <select id="gen-key-bits" class="form-select">
+            <option value="2048">2048 bits</option>
+            <option value="4096">4096 bits</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Optional Passphrase</label>
+        <input type="password" id="gen-key-passphrase" class="form-input" placeholder="Leave blank for no passphrase">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-gen-key">Cancel</button>
+      <button class="btn btn-primary" id="btn-execute-gen-key">⚡ Generate & Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: MASTER PASSWORD SETUP / UNLOCK -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-master-pwd">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-pwd-title">Unlock Vault</div>
+      <button class="modal-close" data-close-modal="modal-master-pwd">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-secondary);" id="modal-pwd-desc">
+        Enter your master password to decrypt passwords and private keys.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Master Password</label>
+        <input type="password" id="input-master-pwd" class="form-input" placeholder="Enter master password..." autofocus>
+      </div>
+      <div class="form-group" id="confirm-pwd-group" style="display:none;">
+        <label class="form-label">Confirm Master Password</label>
+        <input type="password" id="input-confirm-pwd" class="form-input" placeholder="Confirm master password...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-master-pwd">Cancel</button>
+      <button class="btn btn-primary" id="btn-submit-master-pwd">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: QUICK CONNECT -->
+<!-- ========================================== -->
+<div class="modal-overlay" id="modal-quick-connect">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">⚡ Quick SSH Connect</div>
+      <button class="modal-close" data-close-modal="modal-quick-connect">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Connection String</label>
+        <input type="text" id="quick-connect-str" class="form-input" placeholder="user@hostname:22 (e.g. root@192.168.1.50)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="quick-connect-pwd" class="form-input" placeholder="SSH Password">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="modal-quick-connect">Cancel</button>
+      <button class="btn btn-primary" id="btn-exec-quick-connect">Connect Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- VENDOR SCRIPTS -->
+<script src="/static/js/xterm.js"></script>
+<script src="/static/js/xterm-addon-fit.js"></script>
+<script src="/static/js/xterm-addon-web-links.js"></script>
+
+<!-- APP SCRIPTS -->
+<script src="/static/js/terminal.js"></script>
+<script src="/static/js/sftp.js"></script>
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>

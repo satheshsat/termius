@@ -1,0 +1,84 @@
+{
+  "version": "1.0",
+  "vault_meta": {
+    "has_master_password": false,
+    "salt": null,
+    "auth_check": null
+  },
+  "hosts": [],
+  "keys": [
+    {
+      "id": "e93d48ec-a6f4-4381-82aa-ab83af8d81a9",
+      "name": "Automated Test Key",
+      "key_type": "ed25519",
+      "public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDS5L4GqFao7OO0MWVsrQ6HC5IIRoEcrtjeIaKKsTNs8",
+      "private_key_encrypted": "uOBjKflTLfliJ+bAK3t2o255+1rLQvf8ntEUjgDKPTq6G6AIXu0JWIy+xKo9XCgMFwiDGProGshM8pqJJqQh1uEikdQffZppS1MHZmENVaLjuU/AdIqm5z/9xmffjw5U8EJXEzqvtmRmBnxAiXqswgYEvmOOQieWnxjlb75KfB47KTz3zAjaW6WJrsv75ZB/wVvQ2m4bPrXXzaJ5dg1NeUSYIISM73iyMZ7hMH2H3B6Lh1pAh03W5Lj4FKYrhYWVTYZjIbxCiA9Jv0ySK3aRJMs0lCmc6lFo/zRoWeYqWlcr/Et7LeI3UNKUJO4ekIeM1lCHiEmhd8Ow+Uc5wTS0wI/gXogA1Yr41UvIZsP/yka6EhFAEGuSLKGm78gOvaCuhTPvlUe+oL8c6gwSoyxyM769KTAeKD2UXdkpHxPpkt8+GHKR1oV6tKtEyNdn/H3/p/UFKglfR1+04WlnW2IzUKyFxRLtXFL7mc9GVzjuCv3pYpmyMSC+1IDGBmzENCjkuQXRjSuJEeM0eqeX5GAFTpev/Bo3mRDFHzddEM67TQ==",
+      "passphrase_encrypted": null,
+      "fingerprint": "SHA256:g5QqJBHp3bJAYpo4/IywK48Hm6uEFVvOjz077L/TabQ",
+      "created_at": "2026-10-26T09:52:14.027430+00:00"
+    }
+  ],
+  "snippets": [
+    {
+      "id": "snip-system-info",
+      "name": "System Info & Hardware",
+      "command": "uname -a && lsb_release -a && uptime && free -h && df -h",
+      "tags": [
+        "system",
+        "diagnostics"
+      ],
+      "description": "Show kernel version, OS, uptime, memory, and disk space usage."
+    },
+    {
+      "id": "snip-docker-ps",
+      "name": "Docker Container Status",
+      "command": "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'",
+      "tags": [
+        "docker",
+        "devops"
+      ],
+      "description": "List all active Docker containers in a neat formatted table."
+    },
+    {
+      "id": "snip-top-processes",
+      "name": "Top 10 Memory Processes",
+      "command": "ps aux --sort=-%mem | head -n 11",
+      "tags": [
+        "system",
+        "monitoring"
+      ],
+      "description": "Inspect the top 10 memory-consuming processes."
+    },
+    {
+      "id": "snip-network-ports",
+      "name": "Listening Network Ports",
+      "command": "sudo ss -tulpn | grep LISTEN",
+      "tags": [
+        "network",
+        "security"
+      ],
+      "description": "View all open TCP/UDP listening ports and active sockets."
+    }
+  ],
+  "tunnels": [
+    {
+      "id": "9ab13738-0bef-4dd2-b551-329e18fe6bc3",
+      "name": "Remote Postgres DB",
+      "host_id": "e217571d-dbb5-416d-b6cc-a30cc2d1bddd",
+      "tunnel_type": "local",
+      "local_port": 5433,
+      "remote_host": "127.0.0.1",
+      "remote_port": 5432,
+      "auto_start": false,
+      "status": "stopped",
+      "created_at": "2026-10-26T09:52:13.942020+00:00"
+    }
+  ],
+  "settings": {
+    "terminal_font_size": 14,
+    "terminal_theme": "termius-dark",
+    "cursor_blink": true,
+    "terminal_scrollback": 5000,
+    "default_username": "root"
+  }
+}
